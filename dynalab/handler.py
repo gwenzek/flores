@@ -108,7 +108,10 @@ class Handler(BaseDynaHandler):
                 max_len_a=config.get("max_len_a", 1.3),
                 max_len_b=config.get("max_len_b", 5),
                 min_len=config.get("min_len", 5),
+                max_len=model.max_decoder_positions(),
             )
+            if not self.sequence_generator.model.has_incremental:
+                logger.warning("Incremental generation is disabled !!!")
 
         self.taskIO = TaskIO()
         self.initialized = True
@@ -253,12 +256,13 @@ def handle(torchserve_data, context):
 
     start_time = time.time()
     all_samples = deserialize(torchserve_data)
+    all_samples.sort(key=lambda sample: (sample["sourceLanguage"], len(sample["sourceText"])))
     n = len(all_samples)
     logger.info(
         f"Deserialized a batch of size {n} ({n/(time.time()-start_time):.2f} samples / s)"
     )
-    # Adapt this to your model. The GPU has 16Gb of RAM.
-    batch_size = 128
+    # Adapt this to your model. The GPU has 12b of RAM.
+    batch_size = 256
     results = []
     samples = []
     for i, sample in enumerate(all_samples):
